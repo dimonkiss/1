@@ -1,4 +1,4 @@
-name: Django CI
+name: Django CI/CD
 
 on:
   push:
@@ -16,14 +16,44 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install gunicorn whitenoise dj-database-url psycopg2-binary python-dotenv
+    
+    - name: Create Procfile
+      run: |
+        echo "web: gunicorn config.wsgi --log-file -" > Procfile
+    
+    - name: Create runtime.txt
+      run: |
+        echo "python-3.9.18" > runtime.txt
+    
+    - name: Create .env file
+      run: |
+        echo "DEBUG=True" >> .env
+        echo "SECRET_KEY=test-secret-key" >> .env
+        echo "DATABASE_URL=sqlite:///db.sqlite3" >> .env
+    
     - name: Run tests
       run: |
-        python manage.py test 
+        python manage.py test
+    
+    - name: Collect static files
+      run: |
+        python manage.py collectstatic --noinput
+    
+    - name: Check Heroku configuration
+      run: |
+        if [ -f "Procfile" ] && [ -f "runtime.txt" ] && [ -f ".env" ]; then
+          echo "Heroku configuration files are present"
+        else
+          echo "Missing Heroku configuration files"
+          exit 1 
